@@ -11,10 +11,10 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - apps.khong.dev
-      secretName: ticket-queue-tls
+        - demo.ticket-queue.khong.dev
+      secretName: ticket-queue-demo-tls
   rules:
-    - host: apps.khong.dev
+    - host: demo.ticket-queue.khong.dev
       http:
         paths:
           - path: /
@@ -36,7 +36,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: apps.khong.dev
+    - host: demo.ticket-queue.khong.dev
       http:
         paths:
           - path: /

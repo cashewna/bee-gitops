@@ -1,0 +1,10 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: legacy-redirect
+  namespace: ticket-queue
+spec:
+  redirectRegex:
+    regex: ^https?://apps\.khong\.dev/(.*)
+    replacement: https://demo.ticket-queue.khong.dev/$1
+    permanent: true

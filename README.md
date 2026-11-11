@@ -13,7 +13,7 @@ argocd/root-app.yaml          # app-of-apps entry point
 argocd/apps/*.yaml            # Argo CD Application resources
 infra/cert-manager/           # Let's Encrypt ClusterIssuer
 manifests/portfolio/          # portfolio.khong.dev
-manifests/ticket-queue/       # apps.khong.dev (Relay Desk)
+manifests/ticket-queue/       # demo.ticket-queue.khong.dev (Relay Desk)
 manifests/epi-trainer/        # epi-trainer.khong.dev (basic auth)
 ```
 
@@ -57,7 +57,7 @@ ssh -L 8080:127.0.0.1:8080 bee \
 
 ## Demo data
 
-`apps.khong.dev` is a public demo of Relay Desk. The deployment sets
+`demo.ticket-queue.khong.dev` is a public demo of Relay Desk. The deployment sets
 `SEED_DEMO=true` with the app's documented non-production password, so the login
 page shows:
 
@@ -125,7 +125,8 @@ sudo podman save docker.io/cashewna/epi-trainer:sha-<commit> \
 Cloudflare zone `khong.dev`. Create DNS-only A records to `137.23.18.86`:
 
 - `portfolio.khong.dev`
-- `apps.khong.dev`
+- `demo.ticket-queue.khong.dev`
+- `apps.khong.dev` (redirects to the demo host)
 - `epi-trainer.khong.dev`
 
 The apex `khong.dev` stays on Porkbun parking and is not touched. Mail records
