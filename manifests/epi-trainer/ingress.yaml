@@ -1,0 +1,48 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: epi-trainer
+  namespace: epi-trainer
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-dns
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: epi-trainer-basic-auth@kubernetescrd,epi-trainer-security-headers@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - epi-trainer.khong.dev
+      secretName: epi-trainer-tls
+  rules:
+    - host: epi-trainer.khong.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: epi-trainer
+                port:
+                  name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: epi-trainer-http
+  namespace: epi-trainer
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: epi-trainer-redirect-https@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: epi-trainer.khong.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: epi-trainer
+                port:
+                  name: http

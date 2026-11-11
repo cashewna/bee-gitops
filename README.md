@@ -14,6 +14,7 @@ argocd/apps/*.yaml            # Argo CD Application resources
 infra/cert-manager/           # Let's Encrypt ClusterIssuer
 manifests/portfolio/          # portfolio.khong.dev
 manifests/ticket-queue/       # apps.khong.dev (Relay Desk)
+manifests/epi-trainer/        # epi-trainer.khong.dev (basic auth)
 ```
 
 ## Bootstrap
@@ -61,6 +62,9 @@ No secret values live here. Create these out of band:
 - `cert-manager/cloudflare-api-token` — Cloudflare DNS edit token.
 - `ticket-queue/ticket-queue-db` — `POSTGRES_USER`, `POSTGRES_DB`,
   `POSTGRES_PASSWORD`, `DATABASE_URL`.
+- `epi-trainer/epi-trainer-basic-auth` — htpasswd `users` entry for the
+  unsandboxed Java judge. The plaintext credentials are root-only on bee at
+  `/var/lib/secrets/epi-trainer-basic-auth.env`.
 - The Relay Desk agent account is created once with the app's
   `create-user-cli.js`; the password is kept root-only on bee at
   `/var/lib/secrets/ticket-queue-admin.env`.
@@ -88,6 +92,16 @@ sudo nix shell nixpkgs#podman --command podman build \
   -t docker.io/cashewna/portfolio:sha-<commit> .
 sudo podman save docker.io/cashewna/portfolio:sha-<commit> \
   | sudo k3s ctr -n k8s.io images import -
+
+# epi-trainer (source is /home/kk/Projects/epi-trainer on the laptop)
+rsync -a --exclude node_modules --exclude backend/target --exclude dist \
+  --exclude .git --exclude .cache --exclude tests \
+  ~/Projects/epi-trainer/ bee:/home/kk/build/epi-trainer/
+cd /home/kk/build/epi-trainer
+sudo nix shell nixpkgs#podman --command podman build \
+  -t docker.io/cashewna/epi-trainer:sha-<commit> .
+sudo podman save docker.io/cashewna/epi-trainer:sha-<commit> \
+  | sudo k3s ctr -n k8s.io images import -
 ```
 
 ## DNS
@@ -96,6 +110,7 @@ Cloudflare zone `khong.dev`. Create DNS-only A records to `137.23.18.86`:
 
 - `portfolio.khong.dev`
 - `apps.khong.dev`
+- `epi-trainer.khong.dev`
 
 The apex `khong.dev` stays on Porkbun parking and is not touched. Mail records
 (MX, SPF, DKIM) are not touched.
