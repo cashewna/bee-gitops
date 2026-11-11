@@ -1,0 +1,74 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openbao
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://openbao.github.io/openbao-helm
+    chart: openbao
+    targetRevision: 0.30.7
+    helm:
+      releaseName: openbao
+      values: |
+        global:
+          enabled: true
+        # The single-node cluster has no use for the agent injector or CSI.
+        injector:
+          enabled: false
+        csi:
+          enabled: false
+        server:
+          image:
+            # Keep the CLI used by the unseal CronJob in step with the server.
+            tag: "2.7.2"
+          standalone:
+            enabled: true
+            config: |
+              ui = false
+              disable_mlock = true
+              listener "tcp" {
+                address = "[::]:8200"
+                cluster_address = "[::]:8201"
+                tls_disable = 1
+              }
+              storage "pebbledb" {
+                path = "/openbao/data/pebbledb"
+              }
+              audit "file" "file" {
+                description = "Declarative audit log on the audit PVC"
+                options {
+                  file_path = "/openbao/audit/audit.log"
+                }
+              }
+          dataStorage:
+            enabled: true
+            size: 2Gi
+          auditStorage:
+            enabled: true
+            size: 1Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          service:
+            type: ClusterIP
+        ui:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openbao
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

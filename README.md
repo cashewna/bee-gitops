@@ -30,13 +30,13 @@ kubectl create namespace cert-manager
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.21.3/cert-manager.yaml
 ```
 
-Create the Cloudflare API token Secret out of band (the token is root-only on
-bee at `/var/lib/secrets/cloudflare.env` and must never enter this repository):
-
-```bash
-kubectl -n cert-manager create secret generic cloudflare-api-token \
-  --from-literal=api-token="$CLOUDFLARE_DNS_API_TOKEN"
-```
+After the one-time OpenBao bootstrap described in
+[docs/secrets.md](docs/secrets.md), External Secrets Operator creates the
+`cert-manager/cloudflare-api-token` Secret from the OpenBao KV entry. On a
+fresh cluster there is no such entry yet, so apply the bootstrap before the
+app-of-apps. The token is also root-only on bee at
+`/var/lib/secrets/cloudflare.env` for the host's ACME client; neither copy
+belongs in this repository.
 
 Then apply the app-of-apps:
 
@@ -73,14 +73,19 @@ no users; to reset manually, drop the schema and restart the deployment.
 
 ## Secrets
 
-No secret values live here. Create these out of band:
+No secret values live here. OpenBao is the source of truth for the secrets the
+cluster consumes, and External Secrets Operator copies them into Kubernetes.
+The bootstrap credentials, rotation steps and the host-only consumers are in
+[docs/secrets.md](docs/secrets.md).
 
-- `cert-manager/cloudflare-api-token` — Cloudflare DNS edit token.
-- `ticket-queue/ticket-queue-db` — `POSTGRES_USER`, `POSTGRES_DB`,
-  `POSTGRES_PASSWORD`, `DATABASE_URL`.
-- `epi-trainer/epi-trainer-basic-auth` — htpasswd `users` entry for the
-  unsandboxed Java judge. The plaintext credentials are root-only on bee at
-  `/var/lib/secrets/epi-trainer-basic-auth.env`.
+- `cert-manager/cloudflare-api-token` — synced from OpenBao
+  (`secret/cert-manager/cloudflare`). Use a token scoped to
+  `Zone:DNS:Edit` + `Zone:Read` on `khong.dev`, with an expiry.
+- `epi-trainer/epi-trainer-basic-auth` — synced from OpenBao
+  (`secret/epi-trainer/basic-auth`). The plaintext credentials are root-only on
+  bee at `/var/lib/secrets/epi-trainer-basic-auth.env`.
+- `ticket-queue/ticket-queue-db` — still created out of band:
+  `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD`, `DATABASE_URL`.
 - The Relay Desk agent account is created once with the app's
   `create-user-cli.js`; the password is kept root-only on bee at
   `/var/lib/secrets/ticket-queue-admin.env`.
