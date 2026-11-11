@@ -65,9 +65,11 @@ page shows:
 - `agent@example.com`
 - password `demo-pass-123`
 
-Anyone can change the queue. Do not put real data there. The seeded accounts are
-created only when the database has no users; to reset the demo, take a backup of
-anything worth keeping, drop the schema, and restart the deployment.
+Anyone can change the queue. Do not put real data there. A CronJob
+(`manifests/ticket-queue/demo-reset-cronjob.yaml`) truncates the demo tables and
+reseeds every 30 minutes, then recreates the private maintenance account from
+`ticket-queue-admin`. The seeded accounts are created only when the database has
+no users; to reset manually, drop the schema and restart the deployment.
 
 ## Secrets
 

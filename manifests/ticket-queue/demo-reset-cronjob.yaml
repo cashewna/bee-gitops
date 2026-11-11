@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ticket-queue-demo-reset
+  namespace: ticket-queue
+  labels:
+    app.kubernetes.io/name: ticket-queue-demo-reset
+spec:
+  # The public demo is shared, so discard visitor changes every 30 minutes and
+  # recreate the documented seed plus the private maintenance account.
+  schedule: "*/30 * * * *"
+  timeZone: Australia/Sydney
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 120
+      template:
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: reset
+              image: docker.io/cashewna/ticket-queue:sha-d27c62e
+              imagePullPolicy: IfNotPresent
+              command: ["sh", "-c"]
+              args:
+                - |
+                  set -e
+                  node --input-type=module -e '
+                    import pg from "pg";
+                    const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+                    await client.connect();
+                    await client.query("TRUNCATE TABLE ticket_events, ticket_comments, sessions, tickets, users RESTART IDENTITY CASCADE");
+                    await client.end();
+                  '
+                  node dist/db/seed-cli.js
+                  node dist/db/create-user-cli.js --email "$ADMIN_EMAIL" --name "Krishna Khong" --role agent
+              env:
+                - name: DEMO_PASSWORD
+                  value: demo-pass-123
+              envFrom:
+                - secretRef:
+                    name: ticket-queue-db
+                - secretRef:
+                    name: ticket-queue-admin
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 192Mi
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
