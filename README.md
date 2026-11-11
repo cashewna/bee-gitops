@@ -55,6 +55,20 @@ ssh -L 8080:127.0.0.1:8080 bee \
 #   -o jsonpath='{.data.password}' | base64 -d
 ```
 
+## Demo data
+
+`apps.khong.dev` is a public demo of Relay Desk. The deployment sets
+`SEED_DEMO=true` with the app's documented non-production password, so the login
+page shows:
+
+- `requester@example.com`
+- `agent@example.com`
+- password `demo-pass-123`
+
+Anyone can change the queue. Do not put real data there. The seeded accounts are
+created only when the database has no users; to reset the demo, take a backup of
+anything worth keeping, drop the schema, and restart the deployment.
+
 ## Secrets
 
 No secret values live here. Create these out of band:

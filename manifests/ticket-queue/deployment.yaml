@@ -15,6 +15,8 @@ spec:
       labels:
         app.kubernetes.io/name: ticket-queue
     spec:
+      # Public demo deployment: SEED_DEMO shows the app's non-production
+      # accounts on the login page. Do not reuse this manifest for real data.
       securityContext:
         seccompProfile:
           type: RuntimeDefault
@@ -89,7 +91,9 @@ spec:
             - name: LOG_LEVEL
               value: info
             - name: SEED_DEMO
-              value: "false"
+              value: "true"
+            - name: DEMO_PASSWORD
+              value: demo-pass-123
             - name: COOKIE_SECURE
               value: "true"
             - name: TRUST_PROXY

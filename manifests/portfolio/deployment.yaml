@@ -20,8 +20,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: portfolio
-          # Built on bee from cashewna/portfolio at commit ed22b29.
-          image: docker.io/cashewna/portfolio:sha-ed22b29
+          # Built on bee from the portfolio demo build (2026-11-12).
+          image: docker.io/cashewna/portfolio:2026-11-12-demo
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
