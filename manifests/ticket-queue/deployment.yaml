@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-queue
+  namespace: ticket-queue
+  labels:
+    app.kubernetes.io/name: ticket-queue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ticket-queue
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ticket-queue
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-db
+          image: postgres:16.15-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - until pg_isready -h ticket-queue-db -p 5432; do echo waiting for postgres; sleep 2; done
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-queue-db
+                  key: POSTGRES_USER
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-queue-db
+                  key: POSTGRES_DB
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+        - name: migrate
+          image: docker.io/cashewna/ticket-queue:sha-d27c62e
+          imagePullPolicy: IfNotPresent
+          command:
+            - node
+            - dist/db/migrate-cli.js
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-queue-db
+                  key: DATABASE_URL
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      containers:
+        - name: ticket-queue
+          # Built on bee from cashewna/ticket-queue at commit d27c62e.
+          image: docker.io/cashewna/ticket-queue:sha-d27c62e
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-queue-db
+                  key: DATABASE_URL
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3000"
+            - name: HOST
+              value: 0.0.0.0
+            - name: LOG_LEVEL
+              value: info
+            - name: SEED_DEMO
+              value: "false"
+            - name: COOKIE_SECURE
+              value: "true"
+            - name: TRUST_PROXY
+              value: "true"
+            - name: SESSION_TTL_HOURS
+              value: "12"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
