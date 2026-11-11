@@ -21,7 +21,7 @@ spec:
       containers:
         - name: portfolio
           # Built on bee from the portfolio demo-host build (2026-11-12).
-          image: docker.io/cashewna/portfolio:2026-11-12-demo3
+          image: docker.io/cashewna/portfolio:2026-11-12-readonly-ui
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

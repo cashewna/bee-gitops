@@ -26,7 +26,7 @@ spec:
         - name: epi-trainer
           # Built on bee from /home/kk/Projects/epi-trainer at ff2a992 plus
           # the Dockerfile in that repository.
-          image: docker.io/cashewna/epi-trainer:sha-ff2a992
+          image: docker.io/cashewna/epi-trainer:2026-11-12-readonly
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -37,6 +37,10 @@ spec:
               value: /tmp
             - name: JAVA_HOME
               value: /opt/java/openjdk
+            - name: EPI_PUBLIC_DEMO_HOST
+              value: epi-trainer.khong.dev
+            - name: EPI_FULL_ACCESS_URL
+              value: https://epi-trainer-auth.khong.dev/
           startupProbe:
             httpGet:
               path: /api/health

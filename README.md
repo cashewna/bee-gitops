@@ -14,7 +14,7 @@ argocd/apps/*.yaml            # Argo CD Application resources
 infra/cert-manager/           # Let's Encrypt ClusterIssuer
 manifests/portfolio/          # portfolio.khong.dev
 manifests/ticket-queue/       # demo.ticket-queue.khong.dev (Relay Desk)
-manifests/epi-trainer/        # epi-trainer.khong.dev (basic auth)
+manifests/epi-trainer/        # epi-trainer read-only public + auth host
 ```
 
 ## Bootstrap
@@ -127,7 +127,8 @@ Cloudflare zone `khong.dev`. Create DNS-only A records to `137.23.18.86`:
 - `portfolio.khong.dev`
 - `demo.ticket-queue.khong.dev`
 - `apps.khong.dev` (redirects to the demo host)
-- `epi-trainer.khong.dev`
+- `epi-trainer.khong.dev` (read-only public)
+- `epi-trainer-auth.khong.dev` (basic auth; full editor/judge)
 
 The apex `khong.dev` stays on Porkbun parking and is not touched. Mail records
 (MX, SPF, DKIM) are not touched.
