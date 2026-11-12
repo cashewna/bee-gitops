@@ -7,6 +7,15 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
+  # The application controller adds pre-delete finalizers to an Application
+  # that owns CRDs (observability owns the VictoriaMetrics operator CRDs) so
+  # CRs are deleted before their CRDs. They are controller state, not git
+  # state; without this the root app flaps OutOfSync against its children.
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /metadata/finalizers
   source:
     repoURL: https://github.com/cashewna/bee-gitops.git
     targetRevision: main
