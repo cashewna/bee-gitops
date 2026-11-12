@@ -1,0 +1,98 @@
+# Secrets for the monitoring namespace, synced from OpenBao like cert-manager
+# and epi-trainer. The OpenBao policy, Kubernetes auth role and KV entries are
+# a one-time bootstrap; see docs/secrets.md.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eso-openbao
+  namespace: monitoring
+---
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: openbao
+  namespace: monitoring
+spec:
+  provider:
+    vault:
+      server: http://openbao.openbao.svc:8200
+      path: secret
+      version: v2
+      auth:
+        kubernetes:
+          mountPath: kubernetes
+          role: eso-monitoring
+          serviceAccountRef:
+            name: eso-openbao
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: grafana-admin
+  namespace: monitoring
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: SecretStore
+  target:
+    name: grafana-admin
+    creationPolicy: Owner
+  data:
+    - secretKey: admin-user
+      remoteRef:
+        key: monitoring/grafana
+        property: admin-user
+    - secretKey: admin-password
+      remoteRef:
+        key: monitoring/grafana
+        property: admin-password
+---
+# Alertmanager reads /etc/alertmanager/config/alertmanager.yaml from this
+# Secret (vmalertmanager spec.configSecret). The SMTP password stays in
+# OpenBao; everything else is the routing policy, which belongs in git.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: SecretStore
+  target:
+    name: alertmanager-config
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        alertmanager.yaml: |
+          route:
+            receiver: email
+            group_by: [alertname, cluster, namespace]
+            group_wait: 30s
+            group_interval: 5m
+            repeat_interval: 12h
+            routes:
+              # Watchdog always fires and InfoInhibitor is internal bookkeeping.
+              - matchers: ['alertname="Watchdog"']
+                receiver: blackhole
+              - matchers: ['alertname="InfoInhibitor"']
+                receiver: blackhole
+          receivers:
+            - name: blackhole
+            - name: email
+              email_configs:
+                - send_resolved: true
+                  to: krishnakhong@gmail.com
+                  from: krishna@khong.dev
+                  smarthost: mail.khong.dev:587
+                  auth_username: krishna@khong.dev
+                  auth_password: {{ .smtp_password | toJson }}
+                  require_tls: true
+  data:
+    - secretKey: smtp_password
+      remoteRef:
+        key: monitoring/alertmanager
+        property: smtp-password

@@ -1,0 +1,35 @@
+# The chart scrapes everything the stack installs. These two services expose
+# the metrics the dashboard and alerts need from outside the monitoring
+# namespace; vmagent has cluster-wide RBAC for them.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: argocd
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: bee-observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-metrics
+  endpoints:
+    - port: metrics
+      interval: 30s
+      honorLabels: true
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/part-of: bee-observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/component: controller
+  endpoints:
+    - port: http-metrics
+      interval: 30s
+      honorLabels: true

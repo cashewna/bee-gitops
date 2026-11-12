@@ -1,0 +1,112 @@
+# Alerts evaluated by vmalert and routed by Alertmanager (config from OpenBao).
+# Raised in addition to the stack's default rules; the overlapping upstream
+# node rules are disabled in argocd/apps/observability.yaml.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: bee-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: bee-observability
+spec:
+  groups:
+    - name: bee-probes
+      interval: 30s
+      rules:
+        - alert: ProbeFailing
+          expr: probe_success{job=~"blackbox-public|blackbox-mail-tls|blackbox-mail-tcp"} == 0
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Probe {{ $labels.instance }} is failing"
+            description: "Blackbox module {{ $labels.probe }} cannot reach {{ $labels.instance }} for 2 minutes."
+        - alert: ScrapeTargetDown
+          expr: up == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Scrape target {{ $labels.instance }} is down"
+            description: "Job {{ $labels.job }} on {{ $labels.instance }} has been down for 2 minutes."
+        - alert: OpenBaoSealed
+          expr: probe_success{job="blackbox-openbao"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "OpenBao is sealed"
+            description: "The health endpoint returns non-2xx, so OpenBao is sealed or not initialised. ESO secrets stop refreshing."
+    - name: bee-certificates
+      interval: 30s
+      rules:
+        - alert: CertificateExpiringSoon
+          expr: certmanager_certificate_expiration_timestamp_seconds - time() < 14 * 24 * 3600
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "cert-manager certificate {{ $labels.namespace }}/{{ $labels.name }} expires in under 14 days"
+            description: "Renewal has not happened. Check the Certificate and the letsencrypt-dns issuer."
+        - alert: TLSExpiringSoon
+          expr: probe_ssl_earliest_cert_expiry - time() < 14 * 24 * 3600
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "TLS certificate for {{ $labels.instance }} expires in under 14 days"
+            description: "The certificate served for this target expires within 14 days."
+    - name: bee-node
+      interval: 30s
+      rules:
+        - alert: NodeHighCPU
+          expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} CPU is above 85%"
+            description: "Sustained CPU above 85% for 10 minutes on a 2 OCPU node leaves no headroom."
+        - alert: NodeHighMemory
+          expr: 100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 90
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} memory is above 90%"
+            description: "Available memory has been under 10% for 10 minutes; the OOM killer is likely next."
+        - alert: NodeDiskHigh
+          expr: 100 * (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs",mountpoint="/"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs",mountpoint="/"}) > 80
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.instance }} root filesystem is above 80% used"
+            description: "Local-path PVs, images and VMSingle data all live on this filesystem."
+    - name: bee-apps
+      interval: 30s
+      rules:
+        - alert: PodRestarting
+          expr: increase(kube_pod_container_status_restarts_total[1h]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} restarted {{ $value | printf "%.0f" }} times in an hour'
+            description: "Container {{ $labels.container }} is restarting repeatedly; check its exit reason and logs."
+        - alert: ArgoAppOutOfSync
+          expr: argocd_app_info{sync_status!="Synced"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Argo CD app {{ $labels.name }} is {{ $labels.sync_status }}"
+            description: "The app has not matched its Git revision for 15 minutes."
+        - alert: ArgoAppUnhealthy
+          expr: argocd_app_info{health_status!="Healthy"} == 1
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Argo CD app {{ $labels.name }} is {{ $labels.health_status }}"
+            description: "The app's workloads have been unhealthy for 15 minutes."

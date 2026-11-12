@@ -15,6 +15,7 @@ infra/cert-manager/           # Let's Encrypt ClusterIssuer
 manifests/portfolio/          # portfolio.khong.dev
 manifests/ticket-queue/       # demo.ticket-queue.khong.dev (Relay Desk)
 manifests/epi-trainer/        # epi-trainer read-only public + auth host
+manifests/observability/      # blackbox probes, alert rules, Grafana dashboard
 ```
 
 ## Bootstrap
@@ -134,6 +135,7 @@ Cloudflare zone `khong.dev`. Create DNS-only A records to `137.23.18.86`:
 - `apps.khong.dev` (redirects to the demo host)
 - `epi-trainer.khong.dev` (read-only public)
 - `epi-trainer-auth.khong.dev` (basic auth; full editor/judge)
+- `grafana.khong.dev` (dashboard UI; login required)
 
 The apex `khong.dev` stays on Porkbun parking and is not touched. Mail records
 (MX, SPF, DKIM) are not touched.
@@ -145,3 +147,34 @@ ClusterIssuer using the Cloudflare DNS-01 solver. Ingresses request
 certificates with `cert-manager.io/cluster-issuer: letsencrypt-dns`. DNS-01 is
 used so Cloudflare proxying can be enabled later without switching challenge
 types.
+
+## Observability
+
+VictoriaMetrics and Grafana run in `monitoring`; there is no Prometheus.
+`argocd/apps/observability.yaml` installs the
+[VictoriaMetrics k8s stack](https://docs.victoriametrics.com/helm/victoria-metrics-k8s-stack/)
+chart pinned at `0.98.1`, with VMSingle keeping **7 days** on a 20 GiB
+local-path volume and every component sized for the 2 OCPU node. The
+`observability-secrets` app syncs the Grafana and Alertmanager Secrets from
+OpenBao before the stack starts, and `observability-config` adds the blackbox
+probes, alert rules, Argo CD and cert-manager scrapes, and the `bee services`
+dashboard.
+
+The chart's `sync-job` fetches the upstream dashboards and rule sets from
+`raw.githubusercontent.com` at deploy time and applies them as a hook job, so
+the cluster needs egress and those artefacts are not pinned by this repository.
+Our own dashboard, probes and rules are in git.
+
+- Grafana: <https://grafana.khong.dev>, anonymous access off, admin password
+  from OpenBao (`monitoring/grafana`) through External Secrets. See
+  [docs/secrets.md](docs/secrets.md#grafana-and-alertmanager-credentials).
+- Alerts go to email through Stalwart (`mail.khong.dev:587`); the routing
+  policy is in `manifests/observability-secrets/eso.yaml`, the SMTP password in
+  OpenBao.
+- VictoriaMetrics, vmagent and Alertmanager have no Ingress. They are reachable
+  only inside the cluster.
+- Probes cover the public sites, mail ports, and OpenBao's health endpoint, so
+  a sealed OpenBao or an expiring certificate raises an alert.
+
+Deleting the `observability` Application removes the persistent volumes it owns;
+export Grafana's SQLite database or VMSingle's data first if that matters.

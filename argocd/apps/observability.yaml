@@ -1,0 +1,185 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://victoriametrics.github.io/helm-charts
+    chart: victoria-metrics-k8s-stack
+    targetRevision: 0.98.1
+    helm:
+      releaseName: victoria-metrics
+      values: |
+        global:
+          clusterLabel: cluster
+
+        # The single node has no separately exposed etcd, scheduler or
+        # controller-manager, so skip their scrapes, rules and dashboards.
+        kubeEtcd:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
+
+        defaultDashboards:
+          enabled: true
+        defaultRules:
+          enabled: true
+          # bee-alerts in manifests/observability carries these thresholds.
+          rules:
+            NodeCPUHighUsage:
+              enabled: false
+            NodeMemoryHighUtilization:
+              enabled: false
+            NodeFilesystemAlmostOutOfSpace:
+              enabled: false
+          groups:
+            # Our per-target rule alerts after 2m; the upstream one is a job
+            # percentage after 10m and would duplicate it.
+            general.rules:
+              rules:
+                TargetDown:
+                  enabled: false
+            kubernetes-apps:
+              rules:
+                KubePodCrashLooping:
+                  enabled: false
+
+        vmsingle:
+          spec:
+            retentionPeriod: 7d
+            # VictoriaMetrics otherwise sizes its cache from the node's 12 GiB
+            # and the 1 GiB container limit would OOM it.
+            extraArgs:
+              memory.allowedBytes: 640Mi
+            storage:
+              resources:
+                requests:
+                  storage: 20Gi
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                memory: 1Gi
+
+        vmagent:
+          spec:
+            scrapeInterval: 30s
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                memory: 384Mi
+
+        vmalert:
+          spec:
+            evaluationInterval: 30s
+            resources:
+              requests:
+                cpu: 20m
+                memory: 64Mi
+              limits:
+                memory: 192Mi
+
+        alertmanager:
+          spec:
+            # Rendered from OpenBao by External Secrets: never in git.
+            configSecret: alertmanager-config
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 128Mi
+
+        grafana:
+          admin:
+            existingSecret: grafana-admin
+          sidecar:
+            dashboards:
+              # Place dashboards by their grafana_folder annotation.
+              folderAnnotation: grafana_folder
+          grafana.ini:
+            auth.anonymous:
+              enabled: false
+            analytics:
+              reporting_enabled: false
+              check_for_updates: false
+            server:
+              root_url: https://grafana.khong.dev/
+          persistence:
+            enabled: true
+            storageClassName: local-path
+            size: 1Gi
+          ingress:
+            enabled: true
+            ingressClassName: traefik
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-dns
+              traefik.ingress.kubernetes.io/router.entrypoints: websecure
+            hosts:
+              - grafana.khong.dev
+            tls:
+              - secretName: grafana-tls
+                hosts:
+                  - grafana.khong.dev
+          resources:
+            requests:
+              cpu: 20m
+              memory: 128Mi
+            limits:
+              # Grafana 12+/13 documents 512 MiB as the floor with unified
+              # storage; 256 MiB gets OOM-killed while browsing dashboards.
+              memory: 512Mi
+
+        prometheus-node-exporter:
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 96Mi
+
+        kube-state-metrics:
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 192Mi
+
+        victoria-metrics-operator:
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+
+        syncJob:
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true

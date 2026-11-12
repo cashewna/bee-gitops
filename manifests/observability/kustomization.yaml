@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - blackbox.yaml
+  - grafana-ingress.yaml
+  - probes.yaml
+  - rules.yaml
+  - scrapes.yaml
+configMapGenerator:
+  - name: bee-services-dashboard
+    files:
+      - bee-services.json
+generatorOptions:
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: bee

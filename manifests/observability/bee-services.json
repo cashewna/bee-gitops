@@ -1,0 +1,478 @@
+{
+  "uid": "bee-services",
+  "title": "bee services",
+  "tags": ["bee"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "editable": true,
+  "graphTooltip": 1,
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Probes",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_success",
+          "instant": true,
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "DOWN", "color": "red", "index": 1 },
+                "1": { "text": "UP", "color": "green", "index": 0 }
+              }
+            }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Scrape targets up",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(up == 1) / count(up) * 100",
+          "instant": true,
+          "legendFormat": "up"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 90 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "OpenBao",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_success{job=\"blackbox-openbao\"}",
+          "instant": true,
+          "legendFormat": "health"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "SEALED", "color": "red", "index": 1 },
+                "1": { "text": "UNSEALED", "color": "green", "index": 0 }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Probe duration",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "probe_duration_seconds",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 8, "showPoints": "never" }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "TLS expiry · probes (days)",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(probe_ssl_earliest_cert_expiry - time()) / 86400",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "job": true, "probe": true }, "renameByName": { "instance": "target", "Value": "days left" } } }
+      ],
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "days left", "desc": false }] },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "custom": { "align": "auto" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 14 },
+              { "color": "green", "value": 30 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "TLS expiry · cert-manager (days)",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "job": true, "instance": true, "pod": true, "container": true, "endpoint": true, "prometheus": true }, "renameByName": { "Value": "days left" } } }
+      ],
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "days left", "desc": false }] },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "custom": { "align": "auto" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 14 },
+              { "color": "green", "value": 30 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Node CPU",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "thresholdsStyle": { "mode": "line" } },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 75 },
+              { "color": "red", "value": 85 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Node memory",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "thresholdsStyle": { "mode": "line" } },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 80 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Node root disk",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (1 - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs\",mountpoint=\"/\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs\",mountpoint=\"/\"})"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "thresholdsStyle": { "mode": "line" } },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 70 },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Pod CPU · top 10",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{container!=\"\"}[5m])))",
+          "legendFormat": "{{namespace}}/{{pod}}"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 3,
+          "custom": { "lineWidth": 2, "fillOpacity": 8, "showPoints": "never" }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Pod memory · top 10",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, sum by (namespace, pod) (container_memory_working_set_bytes{container!=\"\"}))",
+          "legendFormat": "{{namespace}}/{{pod}}"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "lineWidth": 2, "fillOpacity": 8, "showPoints": "never" }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Pod restarts · last hour",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(kube_pod_container_status_restarts_total[1h]) > 0",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "job": true, "instance": true, "endpoint": true, "prometheus": true, "uid": true }, "renameByName": { "Value": "restarts" } } }
+      ],
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "restarts", "desc": true }] },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "custom": { "align": "auto" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 4 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "title": "Argo CD applications",
+      "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "argocd_app_info",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "job": true, "instance": true, "pod": true, "container": true, "endpoint": true, "namespace": true, "prometheus": true, "prometheus_replica": true }, "renameByName": { "name": "app", "Value": "present" } } }
+      ],
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "app", "desc": false }] },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto" },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "health_status" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "basic" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Healthy": { "color": "green", "index": 0 },
+                      "Progressing": { "color": "orange", "index": 1 },
+                      "Degraded": { "color": "red", "index": 2 },
+                      "Missing": { "color": "red", "index": 3 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "sync_status" },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "basic" }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Synced": { "color": "green", "index": 0 },
+                      "OutOfSync": { "color": "orange", "index": 1 },
+                      "Unknown": { "color": "red", "index": 2 }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

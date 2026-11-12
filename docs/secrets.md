@@ -4,8 +4,8 @@ Three places hold credentials, and only one of them is a source of truth.
 
 | Place | Holds | Managed by |
 | --- | --- | --- |
-| OpenBao (`openbao` namespace) | `secret/cert-manager/cloudflare`, `secret/epi-trainer/basic-auth`, database and PKI engines | Argo CD installs the server; the mounts, auth roles and policies are a one-time bootstrap |
-| Kubernetes Secrets | copies synced by External Secrets Operator from OpenBao | ESO, `manifests/openbao/externalsecrets.yaml` |
+| OpenBao (`openbao` namespace) | `secret/cert-manager/cloudflare`, `secret/epi-trainer/basic-auth`, `secret/monitoring/*`, database and PKI engines | Argo CD installs the server; the mounts, auth roles and policies are a one-time bootstrap |
+| Kubernetes Secrets | copies synced by External Secrets Operator from OpenBao | ESO, `manifests/openbao/externalsecrets.yaml` and `manifests/observability-secrets/eso.yaml` |
 | `/var/lib/secrets` on the host | bootstrap credentials and host-only consumers | root, out of band |
 
 OpenBao is a single-node standalone server (pebbledb) with a 2 GiB data PVC
@@ -169,6 +169,62 @@ kubectl -n epi-trainer annotate externalsecret epi-trainer-basic-auth \
 return 302, and a wrong password must return 401. Update
 `/var/lib/secrets/epi-trainer-basic-auth.users` as well; it is the source for
 the next rebuild.
+
+## Grafana and Alertmanager credentials
+
+Grafana's admin password and Alertmanager's SMTP password are synced into
+`monitoring` by External Secrets, using the `eso-monitoring` role and the
+`monitoring/grafana` and `monitoring/alertmanager` KV entries. Bootstrap once,
+after the `openbao` app is Synced (copy the admin token into the pod first, as
+in the incantation above):
+
+```bash
+# Inside openbao-0, after copying the admin token to /tmp/admin.token as above.
+export BAO_TOKEN=$(cat /tmp/admin.token)
+bao policy write eso-monitoring - <<'EOF'
+path "secret/data/monitoring/*"     { capabilities = ["read"] }
+path "secret/metadata/monitoring/*" { capabilities = ["read", "list"] }
+EOF
+bao write auth/kubernetes/role/eso-monitoring \
+  bound_service_account_names=eso-openbao \
+  bound_service_account_namespaces=monitoring \
+  policies=eso-monitoring ttl=1h
+```
+
+Generate the Grafana admin password without printing it, then store both
+values (the commands run on your machine; the password files stay in the pod's
+`/tmp`, which does not survive a restart):
+
+```bash
+head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32 \
+  | base64 -w0 \
+  | kubectl -n openbao exec -i openbao-0 -- sh -c 'umask 077; base64 -d > /tmp/grafana.pass'
+ssh bee 'sudo cat /var/lib/secrets/stalwart-krishna' \
+  | base64 -w0 \
+  | kubectl -n openbao exec -i openbao-0 -- sh -c 'umask 077; base64 -d > /tmp/smtp.pass'
+
+kubectl -n openbao exec openbao-0 -- sh -c '
+  export BAO_TOKEN=$(cat /tmp/admin.token)
+  bao kv put secret/monitoring/grafana admin-user=admin admin-password=@/tmp/grafana.pass
+  bao kv put secret/monitoring/alertmanager smtp-password=@/tmp/smtp.pass
+  rm -f /tmp/grafana.pass /tmp/smtp.pass'
+```
+
+Read the admin password with:
+
+```bash
+kubectl -n monitoring get secret grafana-admin \
+  -o jsonpath='{.data.admin-password}' | base64 -d; echo
+```
+
+Rotating either value is a `bao kv put`, then
+`kubectl -n monitoring annotate externalsecret <name> force-sync=$(date +%s) --overwrite`.
+Grafana reads its admin password only at start, so restart the deployment after
+a rotation; Alertmanager reloads its config from the Secret on its own.
+
+Alertmanager delivers through Stalwart at `mail.khong.dev:587` as the
+`krishna@khong.dev` account; the recipient and routing policy live in
+`manifests/observability/eso.yaml`, not in OpenBao.
 
 ## Rotating the OCI SMTP credential
 

@@ -1,0 +1,92 @@
+# Probes are read by vmagent from the blackbox exporter at
+# blackbox-exporter.monitoring.svc:9115. Each target keeps its real address in
+# the `instance` label, so alerts and dashboards name what is down.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMProbe
+metadata:
+  name: public-https
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: bee-observability
+spec:
+  jobName: blackbox-public
+  module: http_2xx
+  interval: 30s
+  scrapeTimeout: 10s
+  vmProberSpec:
+    url: blackbox-exporter.monitoring.svc:9115
+  targets:
+    static:
+      targets:
+        - https://portfolio.khong.dev
+        - https://epi-trainer.khong.dev
+        - https://demo.ticket-queue.khong.dev
+      labels:
+        probe: public-https
+---
+# OpenBao answers 200 only when initialised and unsealed; 503 means sealed.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMProbe
+metadata:
+  name: openbao-health
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: bee-observability
+spec:
+  jobName: blackbox-openbao
+  module: http_2xx
+  interval: 30s
+  scrapeTimeout: 10s
+  vmProberSpec:
+    url: blackbox-exporter.monitoring.svc:9115
+  targets:
+    static:
+      targets:
+        - http://openbao.openbao.svc:8200/v1/sys/health
+      labels:
+        probe: openbao
+---
+# TLS handshakes, so probe_ssl_earliest_cert_expiry stays available for mail.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMProbe
+metadata:
+  name: mail-tls
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: bee-observability
+spec:
+  jobName: blackbox-mail-tls
+  module: tcp_tls
+  interval: 30s
+  scrapeTimeout: 10s
+  vmProberSpec:
+    url: blackbox-exporter.monitoring.svc:9115
+  targets:
+    static:
+      targets:
+        - mail.khong.dev:993
+        - mail.khong.dev:465
+      labels:
+        probe: mail-tls
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMProbe
+metadata:
+  name: mail-tcp
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: bee-observability
+spec:
+  jobName: blackbox-mail-tcp
+  module: tcp_connect
+  interval: 30s
+  scrapeTimeout: 10s
+  vmProberSpec:
+    url: blackbox-exporter.monitoring.svc:9115
+  targets:
+    static:
+      targets:
+        - mail.khong.dev:25
+        - mail.khong.dev:25565
+      labels:
+        probe: mail-tcp
