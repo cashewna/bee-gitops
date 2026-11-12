@@ -141,9 +141,10 @@ spec:
               cpu: 20m
               memory: 128Mi
             limits:
-              # Grafana 12+/13 documents 512 MiB as the floor with unified
-              # storage; 256 MiB gets OOM-killed while browsing dashboards.
-              memory: 512Mi
+              # Grafana 13's unified-storage index sits near 520 MiB with the
+              # default dashboards; 256 MiB OOM-kills it and 512 MiB leaves no
+              # room for a burst.
+              memory: 768Mi
 
         prometheus-node-exporter:
           # The resources keep the upstream chart name; rename them so a pod
