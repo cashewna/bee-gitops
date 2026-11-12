@@ -13,8 +13,10 @@ spec:
     - name: bee-probes
       interval: 30s
       rules:
+        # The Minecraft server is started by hand, so its probe stays visible on
+        # the dashboard without paging while the port is intentionally closed.
         - alert: ProbeFailing
-          expr: probe_success{job!="blackbox-openbao"} == 0
+          expr: probe_success{job!~"blackbox-openbao|blackbox-minecraft"} == 0
           for: 2m
           labels:
             severity: warning
