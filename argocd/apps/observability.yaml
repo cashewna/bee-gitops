@@ -16,6 +16,10 @@ spec:
     helm:
       releaseName: victoria-metrics
       values: |
+        # Short names: the operator prefixes components (vmalertmanager-) and a
+        # release-chart name pushes pod labels past Kubernetes' 63-byte limit.
+        fullnameOverride: vm
+
         global:
           clusterLabel: cluster
 
@@ -56,9 +60,9 @@ spec:
           spec:
             retentionPeriod: 7d
             # VictoriaMetrics otherwise sizes its cache from the node's 12 GiB
-            # and the 1 GiB container limit would OOM it.
+            # and the 1 GiB container limit would OOM it. The flag takes bytes.
             extraArgs:
-              memory.allowedBytes: 640Mi
+              memory.allowedBytes: "671088640"
             storage:
               resources:
                 requests:
