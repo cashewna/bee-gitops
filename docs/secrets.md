@@ -27,10 +27,9 @@ ssh bee 'kubectl -n openbao exec openbao-0 -- bao operator init \
 # unseal_keys_b64[0] -> /var/lib/secrets/openbao-unseal (0600 root)
 # root_token          -> a root-only file used only for this bootstrap
 
-# 2. Create the bootstrap Secret the unseal CronJob mounts.
-ssh bee "sudo -n cat /var/lib/secrets/openbao-unseal" \
-  | ssh bee 'kubectl -n openbao create secret generic openbao-unseal \
-      --from-file=key=/dev/stdin --dry-run=client -o yaml | kubectl apply -f -'
+# 2. Keep the key root-only on the host. The NixOS timer in nixos-config
+#    (hosts/oracle) reads it and retries every two minutes; no Kubernetes
+#    Secret holds it.
 
 # 3. Unseal. The CLI refuses a non-TTY, so feed it from a file inside the pod.
 ssh bee 'kubectl -n openbao exec -i openbao-0 -- sh -c "umask 077; cat > /tmp/unseal.key"' < unseal.key
@@ -54,15 +53,24 @@ bao write auth/kubernetes/config \
   kubernetes_host="https://kubernetes.default.svc" \
   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
-# ESO may read every KV entry but not write it.
-bao policy write eso-read - <<'EOF'
-path "secret/data/*"     { capabilities = ["read"] }
-path "secret/metadata/*" { capabilities = ["read", "list"] }
+# One identity per consumer. ESO mints a token for the eso-openbao
+# ServiceAccount in each namespace; each role reads only its own prefix.
+bao policy write eso-cert-manager - <<'EOF'
+path "secret/data/cert-manager/*"     { capabilities = ["read"] }
+path "secret/metadata/cert-manager/*" { capabilities = ["read", "list"] }
 EOF
-bao write auth/kubernetes/role/eso \
-  bound_service_account_names=external-secrets \
-  bound_service_account_namespaces=external-secrets \
-  policies=eso-read ttl=1h
+bao policy write eso-epi-trainer - <<'EOF'
+path "secret/data/epi-trainer/*"     { capabilities = ["read"] }
+path "secret/metadata/epi-trainer/*" { capabilities = ["read", "list"] }
+EOF
+bao write auth/kubernetes/role/eso-cert-manager \
+  bound_service_account_names=eso-openbao \
+  bound_service_account_namespaces=cert-manager \
+  policies=eso-cert-manager ttl=1h
+bao write auth/kubernetes/role/eso-epi-trainer \
+  bound_service_account_names=eso-openbao \
+  bound_service_account_namespaces=epi-trainer \
+  policies=eso-epi-trainer ttl=1h
 
 # The database engine uses the application's Postgres user, which owns the
 # database and can create roles. Read both values from the ticket-queue-db
@@ -100,11 +108,11 @@ bao token revoke -self
 
 These cannot live in OpenBao, because OpenBao needs them to start.
 
-- `openbao/openbao-unseal` (Secret, key `key`) and
-  `/var/lib/secrets/openbao-unseal` (0600 root) hold the single unseal key.
-  The `openbao-unseal` CronJob reads the Secret every two minutes and unseals
-  the server after a pod restart. Losing both copies means the data is
-  unrecoverable.
+- `/var/lib/secrets/openbao-unseal` (0600 root) holds the single unseal key.
+  The `openbao-unseal.timer` in `nixos-config` (`hosts/oracle`) reads it and
+  retries every two minutes after a pod or node restart, so the key never
+  enters Kubernetes and cluster-admin alone cannot unseal. Losing the file
+  (and its offline backup) means the data is unrecoverable.
 - `/var/lib/secrets/openbao-admin-token` (0600 root) is an **orphan** token
   with the `platform-admin` policy and a 30-day TTL. It is the credential for
   `bao` operations and the database/PKI recipes below. Renew it before it
@@ -211,9 +219,10 @@ in-cluster identities.
   `…/epi-trainer-basic-auth.users`, but the PKI and database configuration
   would be recreated from the commands above. Add a volume snapshot before
   relying on it.
-- `openbao-config` manages resources in three namespaces. Pruning that
-  Application deletes the ExternalSecrets, and their `ownerReferences` then
-  garbage-collect `cert-manager/cloudflare-api-token` and
-  `epi-trainer/epi-trainer-basic-auth` until ESO recreates them.
+- `openbao-config` manages resources in the cert-manager and epi-trainer
+  namespaces. Pruning that Application deletes the ExternalSecrets and
+  SecretStores, and their `ownerReferences` then garbage-collect
+  `cert-manager/cloudflare-api-token` and `epi-trainer/epi-trainer-basic-auth`
+  until ESO recreates them.
 - The in-cluster listener is HTTP with no NetworkPolicy; every pod can reach
   `openbao:8200`, though a request without a token is rejected.
