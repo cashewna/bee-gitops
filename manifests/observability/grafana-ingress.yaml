@@ -28,6 +28,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: vm-grafana
+                name: victoria-metrics-grafana
                 port:
                   name: service

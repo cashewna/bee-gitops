@@ -146,6 +146,9 @@ spec:
               memory: 512Mi
 
         prometheus-node-exporter:
+          # The resources keep the upstream chart name; rename them so a pod
+          # list does not read as if Prometheus were installed.
+          fullnameOverride: node-exporter
           resources:
             requests:
               cpu: 20m
