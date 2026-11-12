@@ -69,15 +69,18 @@ spec:
       labels:
         probe: mail-tls
 ---
+# OCI blocks outbound TCP 25 from the instance, so an in-cluster probe of the
+# public name times out even though the listener is healthy. Probe the node
+# address instead; external reachability is what MX records cover.
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMProbe
 metadata:
-  name: mail-tcp
+  name: mail-smtp
   namespace: monitoring
   labels:
     app.kubernetes.io/part-of: bee-observability
 spec:
-  jobName: blackbox-mail-tcp
+  jobName: blackbox-mail-smtp
   module: tcp_connect
   interval: 30s
   scrapeTimeout: 10s
@@ -86,7 +89,27 @@ spec:
   targets:
     static:
       targets:
-        - mail.khong.dev:25
+        - 10.0.0.235:25
+      labels:
+        probe: mail-smtp
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMProbe
+metadata:
+  name: minecraft
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: bee-observability
+spec:
+  jobName: blackbox-minecraft
+  module: tcp_connect
+  interval: 30s
+  scrapeTimeout: 10s
+  vmProberSpec:
+    url: blackbox-exporter.monitoring.svc:9115
+  targets:
+    static:
+      targets:
         - mail.khong.dev:25565
       labels:
-        probe: mail-tcp
+        probe: minecraft

@@ -14,7 +14,7 @@ spec:
       interval: 30s
       rules:
         - alert: ProbeFailing
-          expr: probe_success{job=~"blackbox-public|blackbox-mail-tls|blackbox-mail-tcp"} == 0
+          expr: probe_success{job!="blackbox-openbao"} == 0
           for: 2m
           labels:
             severity: warning
