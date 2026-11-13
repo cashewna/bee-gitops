@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: burrow
+  namespace: burrow
+  labels:
+    app.kubernetes.io/name: burrow
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: burrow
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
