@@ -21,7 +21,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "probe_success",
+          "expr": "probe_success{job!=\"blackbox-minecraft\"}",
           "instant": true,
           "legendFormat": "{{instance}}"
         }

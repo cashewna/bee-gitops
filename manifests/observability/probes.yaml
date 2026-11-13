@@ -93,6 +93,8 @@ spec:
       labels:
         probe: mail-smtp
 ---
+# Minecraft is on-demand on bee; probe the node IP directly so it is not
+# mislabelled as mail.khong.dev and does not depend on public DNS.
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMProbe
 metadata:
@@ -110,6 +112,6 @@ spec:
   targets:
     static:
       targets:
-        - mail.khong.dev:25565
+        - 10.0.0.235:25565
       labels:
         probe: minecraft
