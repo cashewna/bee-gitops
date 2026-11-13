@@ -21,7 +21,7 @@ spec:
       containers:
         - name: portfolio
           # Multi-arch image (linux/arm64 + linux/amd64) published by portfolio CI.
-          image: ghcr.io/cashewna/portfolio:sha-ee89daf
+          image: ghcr.io/cashewna/portfolio:sha-d32e615
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
